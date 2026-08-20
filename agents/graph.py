@@ -1,10 +1,19 @@
+from langchain.agents import create_agent
 from langchain_groq import ChatGroq
+from langchain_core.globals import set_verbose, set_debug
 from dotenv import load_dotenv
 import os
 from rich import print
-from pydantic import BaseModel
+from agents.prompts import planner_prompt, architect_prompt, coder_system_prompt
+from agents.states import Plan , TaskPlan, CoderState
+from langgraph.graph import StateGraph
+from agents.tools import *
+from langgraph.constants import END
 
 load_dotenv()
+
+set_debug(True)
+set_verbose(True)
 
 llm = ChatGroq(
     model="openai/gpt-oss-120b",
@@ -12,56 +21,100 @@ llm = ChatGroq(
     temperature=0
 )
 
-user_prompt = "build a scientific calculator web application"
+def planner_agent(state: dict) -> dict:
+    users_prompt = state["user_prompt"]
+    response = llm.with_structured_output(Plan).invoke(planner_prompt(users_prompt))
+    if response is None:
+        raise ValueError("Planner plan nai kar paya soory yawr")
+    return {"plan": response}
 
 
-class Plan(BaseModel):
-    project_objective: str
-    core_features: list[str]
-    user_interactions: list[str]
-    components: list[str]
-    technologies: list[str]
-    dependencies: list[str]
-    implementation_steps: list[str]
-    edge_cases: list[str]
+def architect_agent(state: dict) -> dict:
+    plan: Plan = state["plan"]
+    response = llm.with_structured_output(TaskPlan, method="json_mode").invoke(architect_prompt(plan))
+    if response is None:
+        raise ValueError("Architecture architect nai kar paya soory yawr")
+    response.plan = plan
+    return {"task_plan": response}
 
 
-planner_prompt = f"""
-You are the Planner Agent in an autonomous AI software engineering system.
+def coder_agent(state: dict) -> dict:
+    coder_state: CoderState = state.get("coder_state")
+    if coder_state is None:
+        coder_state = CoderState(
+            task_plan=state["task_plan"],
+            current_step_idx=0
+        )
+    steps = coder_state.task_plan.implementation_steps
+   
+    if coder_state.current_step_idx >= len(steps):
+        return {
+            "coder_state": coder_state,
+            "status": "DONE"
+        }
 
-Your job is to analyze the user's request and create a clear implementation
-plan for the software project.
+    current_task = steps[coder_state.current_step_idx]
 
-User Request:
-{user_prompt}
+    system_prompt = coder_system_prompt()
 
-Create a practical plan that the Architect Agent can directly use.
-
-Include:
-1. Project objective
-2. Core features
-3. User interactions
-4. Required pages/components
-5. Required technologies/frameworks
-6. Data/state requirements
-7. Important dependencies
-8. Step-by-step implementation tasks
-9. Potential edge cases
-
-Rules:
-- Do NOT write actual code.
-- Do NOT explain your reasoning.
-- Do NOT add unnecessary features.
-- Keep the plan specific and implementation-ready.
-- Make reasonable technical decisions when the user does not specify them.
-- If this is a modification to an existing project, focus only on the requested changes.
-"""
-
-structured_llm = llm.with_structured_output(
-    Plan,
-    method="function_calling"
+    user_prompt = (
+    f"Task: {current_task.task_description}\n"
+    f"File: {current_task.filepath}\n"
+    "Inspect the existing project using the available tools and "
+    "implement this task. Use write_file() to save your changes."
 )
+    coder_tools = [
+        read_file,
+        write_file,
+        list_files,
+        get_current_directory,
+        run_cmd
+    ]
 
-response = structured_llm.invoke(planner_prompt)
+    c_agent = create_agent(
+        model=llm,
+        tools=coder_tools,
+        system_prompt=system_prompt
+    )
 
-print(response)
+    c_agent.invoke({
+        "messages": [
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ]
+    })
+
+    # Current task is now completed
+    coder_state.current_step_idx += 1
+
+    # Check immediately after completing the task
+    if coder_state.current_step_idx >= len(steps):
+        status = "DONE"
+    else:
+        status = "CODING"
+
+    return {
+        "coder_state": coder_state,
+        "status": status
+    }
+
+graph = StateGraph(dict)
+graph.add_node("planner", planner_agent)
+graph.add_node("architect", architect_agent)
+graph.add_node("coder", coder_agent)
+graph.add_edge("planner","architect")
+graph.add_edge("architect","coder")
+graph.add_conditional_edges(
+    "coder",
+    lambda s: "END" if s.get("status") == "DONE" else "coder",
+    {"END": END, "coder": "coder"}
+)
+graph.set_entry_point("planner")
+agent = graph.compile()
+
+if __name__ == "__main__":
+    result = agent.invoke({"user_prompt": "Build a colourful modern todo app in html css and js"},
+                          {"recursion_limit": 100})
+    print("Final State:", result)
