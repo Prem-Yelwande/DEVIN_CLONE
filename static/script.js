@@ -1,3 +1,6 @@
+
+const API_URL = 'https://devin-clone.onrender.com';
+
 const chatMessages = document.getElementById('chat-messages');
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
@@ -22,7 +25,7 @@ function addMessage(role, text, extraClass = '') {
 }
 
 function refreshPreview() {
-  const url = '/project/index.html?t=' + Date.now();
+  const url = API_URL + '/project/index.html?t=' + Date.now();
   fetch(url).then(res => {
     if (res.ok) {
       previewFrame.src = url;
@@ -51,12 +54,14 @@ async function sendPrompt() {
   const loadingMsg = addMessage('assistant', projectStarted ? 'Applying changes...' : 'Building your app...', 'loading');
 
   try {
-    const endpoint = projectStarted ? '/edit' : '/generate';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: text })
-    });
+  const endpoint = projectStarted ? '/edit' : '/generate';
+
+  const res = await fetch(API_URL + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: text })
+  });
+  
     const data = await res.json();
 
     loadingMsg.remove();
@@ -93,7 +98,7 @@ chatInput.addEventListener('input', () => {
 
 resetBtn.addEventListener('click', async () => {
   if (isLoading) return;
-  await fetch('/reset', { method: 'POST' });
+  await fetch(API_URL + '/reset', { method: 'POST' });
   projectStarted = false;
   chatMessages.innerHTML = '<div class="empty-state"><p>Describe what you want to build.</p></div>';
   previewFrame.classList.add('hidden');
@@ -102,7 +107,7 @@ resetBtn.addEventListener('click', async () => {
 });
 
 downloadBtn.addEventListener('click', () => {
-  window.location.href = '/download';
+  window.location.href = API_URL + '/download';
 });
 
 // On load, check if a project already exists
