@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Engineer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <div class="chat-panel">
+    <div class="chat-header">
+      <span class="logo-dot"></span>
+      <span class="logo-text">AI Engineer</span>
+      <button id="download-btn" class="reset-btn" title="Download project">Download</button>
+      <button id="reset-btn" class="reset-btn" title="Start new project">New</button>
+    </div>
+
+    <div id="chat-messages" class="chat-messages">
+      <div class="empty-state">
+        <p>Describe what you want to build.</p>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea id="chat-input" placeholder="Build a modern todo app..." rows="1"></textarea>
+      <button id="send-btn" class="send-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M13 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="preview-panel">
+    <div class="preview-header">
+      <span>Preview</span>
+    </div>
+    <div class="preview-body">
+      <iframe id="preview-frame" src="about:blank" class="hidden"></iframe>
+      <div id="preview-empty" class="preview-empty">
+        <p>Your app will appear here</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/script.js"></script>
+</body>
+</html>

@@ -22,10 +22,11 @@ def main():
     try:
         init_project_root()
 
+        mode = input("New project or edit existing? (new/edit): ").strip().lower()
         user_prompt = input("Enter your project prompt: ")
 
         result = agent.invoke(
-            {"user_prompt": user_prompt},
+            {"user_prompt": user_prompt, "mode": mode},
             {"recursion_limit": args.recursion_limit}
         )
 

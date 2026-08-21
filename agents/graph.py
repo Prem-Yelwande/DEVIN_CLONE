@@ -1,8 +1,9 @@
 from langchain.agents import create_agent
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.globals import set_verbose, set_debug
 from dotenv import load_dotenv
 import os
+from agents.tools import PROJECT_ROOT
 from rich import print
 from agents.prompts import planner_prompt, architect_prompt, coder_system_prompt
 from agents.states import Plan , TaskPlan, CoderState
@@ -15,9 +16,9 @@ load_dotenv()
 set_debug(True)
 set_verbose(True)
 
-llm = ChatGroq(
-    model="openai/gpt-oss-120b",
-    api_key=os.getenv("GROQ_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.1-flash-lite",
+    api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0
 )
 
@@ -100,18 +101,41 @@ def coder_agent(state: dict) -> dict:
         "status": status
     }
 
+def has_existing_project() -> bool:
+    return PROJECT_ROOT.exists() and any(PROJECT_ROOT.iterdir())
+
+def route_entry(state: dict) -> str:
+    return state.get("mode", "new")
+
+def edit_agent(state: dict) -> dict:
+    user_prompt = state["user_prompt"]
+    system_prompt = coder_system_prompt()
+    files_list = list_files.invoke({"directory": "."})
+    task_prompt = (
+        f"The user wants this change applied to the EXISTING project: {user_prompt}\n"
+        f"Existing files:\n{files_list}\n"
+        "Inspect the relevant file(s) with read_file(), make the necessary edits, "
+        "and save changes using write_file(). Only modify files relevant to this request."
+    )
+    coder_tools = [read_file, write_file, list_files, get_current_directory, run_cmd]
+    e_agent = create_agent(model=llm, tools=coder_tools, system_prompt=system_prompt)
+    e_agent.invoke({"messages": [{"role": "user", "content": task_prompt}]})
+    return {"status": "DONE"}
+
 graph = StateGraph(dict)
 graph.add_node("planner", planner_agent)
 graph.add_node("architect", architect_agent)
 graph.add_node("coder", coder_agent)
-graph.add_edge("planner","architect")
-graph.add_edge("architect","coder")
+graph.add_node("edit", edit_agent)
+graph.add_edge("planner", "architect")
+graph.add_edge("architect", "coder")
+graph.add_edge("edit", END)
 graph.add_conditional_edges(
     "coder",
     lambda s: "END" if s.get("status") == "DONE" else "coder",
     {"END": END, "coder": "coder"}
 )
-graph.set_entry_point("planner")
+graph.set_conditional_entry_point(route_entry, {"new": "planner", "edit": "edit"})
 agent = graph.compile()
 
 if __name__ == "__main__":

@@ -50,11 +50,14 @@ def list_files(directory: str = ".") -> str:
     return "\n".join(files) if files else "No files found."
 
 @tool
-def run_cmd(cmd: str, cwd: str = None, timeout: int = 30) -> Tuple[int, str, str]:
+def run_cmd(cmd: str, cwd: str = None, timeout: int = 30) -> str:
     """Runs a shell command in the specified directory and returns the result."""
-    cwd_dir = safe_path_for_project(cwd) if cwd else PROJECT_ROOT
-    res = subprocess.run(cmd, shell=True, cwd=str(cwd_dir), capture_output=True, text=True, timeout=timeout)
-    return res.returncode, res.stdout, res.stderr
+    try:
+        cwd_dir = safe_path_for_project(cwd) if cwd else PROJECT_ROOT
+        res = subprocess.run(cmd, shell=True, cwd=str(cwd_dir), capture_output=True, text=True, timeout=timeout)
+        return f"EXIT:{res.returncode}\nSTDOUT:{res.stdout}\nSTDERR:{res.stderr}"
+    except Exception as e:
+        return f"ERROR running command: {e}"
 
 
 def init_project_root():
