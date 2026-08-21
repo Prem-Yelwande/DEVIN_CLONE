@@ -5,11 +5,22 @@ from pydantic import BaseModel
 import shutil
 import tempfile
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
 from agents.graph import agent
 from agents.tools import init_project_root, PROJECT_ROOT
 
 app = FastAPI()
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://devin-clone-oe17.onrender.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 init_project_root()
 
